@@ -1,27 +1,53 @@
 # Git LOC Plot
 
-Plot lines of code over time in a Git repository
+Plots lines of code over time in a Git repository.
 
-Counts the lines of codes in each commit in the current branch. Outputs two files; a .csv file with LOC data, and a .png image visualizing lines of code per language over time.
+This script uses [cloc](https://github.com/AlDanial/cloc) to count lines of codes in each commit of a branch in a given repository. 
+
+The output consists of two files:
+
+* CSV file with lines of code per language over time:
+    ```
+    date,language,code
+    2025-04-07 16:41:58+03:00,Java,549
+    2025-04-07 16:30:41+03:00,Java,549
+    2024-11-29 09:25:50+02:00,Java,522
+    ```
+* PNG image:
+    ![](./output_example.png)
 
 ## Dependencies
-- [cloc](https://github.com/AlDanial/cloc) `sudo apt install cloc`
-- pandas `pip install pandas`
-- matplotlib `pip install matplotlib`
+* [cloc](https://github.com/AlDanial/cloc) (`sudo apt install cloc`)
+* python3 (`sudo apt install python3`)
+* pandas (`pip install pandas`)
+* matplotlib (`pip install matplotlib`)
+
+## Setup
+```
+sudo apt install -y cloc
+python3 -m venv venv
+source venv/bin/activate
+pip install pandas matplotlib
+```
 
 ## Usage
 
 Basic usage:
 
 ```
-python loc.py <path-to-repo> --langs=Java
+python git-loc-plot.py <path-to-repo> [--outdir <dir>] [--langs <Java,Gradle,...>]
 ```
 
-Use `--langs` to filter the output to one or more languages
+Use `--langs` to filter the output to one or more specific languages.
 
-The option takes a comma-separated list of languages supported by cloc. To see supported languages: `clocl -show-lang`.
+Specify a comma-separated list of languages. To view full list of supported languages: `cloc -show-lang`.
 
 ```
-python loc.py <path-to-repo> --langs=Java
+python loc.py /path/to/repo --langs Java,Gradle
 ```
 
+Use `--outdir` to specify a different directory to store output files. If not specified, files are written to the current work directory.
+
+```
+python loc.py /path/to/repo --langs Python --outdir ./results
+```

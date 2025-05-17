@@ -17,6 +17,7 @@ def count_loc(repo_path, csv_path, langs):
     )
     n_commits = len(commits)
     loc_files = []
+    df = pd.DataFrame()
 
     with tempfile.TemporaryDirectory(delete=False) as temp_dir:
         for i, commit in enumerate(commits, 1):
@@ -36,33 +37,36 @@ def count_loc(repo_path, csv_path, langs):
                 .strip()
             )
 
-            loc_file = f"{temp_dir}/{cmt_date}.csv"
-
+            loc_file = os.path.join(temp_dir, f"{cmt_date}.csv")
             cloc_args = ["cloc", commit, "--git", "--vcs=git", "--csv", f"--report-file={loc_file}"]
+
             if langs:
                 cloc_args.append(f"--include-lang={langs}")
 
             subprocess.run(cloc_args, cwd=repo_path, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+            if not os.path.exists(loc_file):
+                print(f"\nWarning: cloc did not produce any output for commit {commit}")
+                continue
+
             loc_files.append(loc_file)
 
-    # join all files together
-    df = pd.DataFrame()
+        # merge partial files together to a single table
+        for file in loc_files:
+            partial_df = pd.read_csv(file)
 
-    for file in loc_files:
-        partial_df = pd.read_csv(file)
+            # Don't want the generated SUM row
+            partial_df = partial_df[partial_df["language"] != "SUM"]
 
-        # Don't want the generated SUM row
-        partial_df = partial_df[partial_df["language"] != "SUM"]
+            date = os.path.basename(file)
+            date = str.split(date, ".")[0]
+            date = datetime.fromisoformat(date)
+            partial_df["date"] = date
+            partial_df = partial_df[["date", "language", "code"]]
+            
+            df = pd.concat([df, partial_df], ignore_index=True)
 
-        date = os.path.basename(file)
-        date = str.split(date, ".")[0]
-        date = datetime.fromisoformat(date)
-        partial_df["date"] = date
-        partial_df = partial_df[["date", "language", "code"]]
-        
-        df = pd.concat([df, partial_df], ignore_index=True)
-
-    df.to_csv(csv_path)
+    df.to_csv(csv_path, index=False)
     return df
 
 def plot(df, png_path):
@@ -81,7 +85,6 @@ def plot(df, png_path):
     plt.tight_layout()
 
     plt.savefig(png_path)
-    print(f"Plot saved to {png_path}")
 
 def main():
     parser = argparse.ArgumentParser(description="Count lines of code per commit.")
@@ -97,8 +100,8 @@ def main():
 
     repo_name = repo_path.name
 
-    csv_path = f"{args.outdir}/loc_{repo_name}.csv"
-    png_path = f"{args.outdir}/loc_{repo_name}.png"
+    csv_path = os.path.join(args.outdir, f"loc_{repo_name}.csv")
+    png_path = os.path.join(args.outdir, f"loc_{repo_name}.png")
 
     df = count_loc(repo_path, csv_path, args.langs)
     plot(df, png_path)
