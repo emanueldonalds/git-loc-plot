@@ -8,7 +8,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from pathlib import Path
 
-def count_loc(repo_path, outdir):
+def count_loc(repo_path, csv_path, langs):
     commits = (
         subprocess.check_output(["git", "rev-list", "HEAD"], cwd=repo_path)
         .decode()
@@ -32,32 +32,33 @@ def count_loc(repo_path, outdir):
                 .strip()
             )
 
+            cloc_args = ["cloc", commit, "--git", "--vcs=git", "--csv"]
+            if langs:
+                cloc_args.append(f"--include-lang={langs}")
+
             cloc_output = (
                 subprocess.check_output(
-                    ["cloc", commit, "-q", "--git", "--csv"], cwd=repo_path
+                    cloc_args, cwd=repo_path
                 )
                 .decode()
                 .splitlines()
             )
 
-            data_lines = cloc_output[2:-1]
+            data_lines = cloc_output[1:-1]
             for line in data_lines:
                 row = f"{cmt_date},{line}"
                 temp_file.write(row + "\n")
 
             print(f"\rCounting LOC in commit {commit} [{i} / {n_commits}] ", end="")
 
-    csv_outfile = f"{outdir}/loc.csv"
-    os.replace(temp_file.name, csv_outfile)
-    print(f"\nDone! Output written to {csv_outfile}")
-    return csv_outfile
+    os.replace(temp_file.name, csv_path)
 
-def plot(csv_file):
-    df = pd.read_csv(csv_file, header=None, names=["date", "files", "language", "blank", "comment", "code"])
+def plot(csv_path, png_path):
+    df = pd.read_csv(csv_path, header=None, names=["date", "files", "language", "blank", "comment", "code"])
 
-    df["date"] = pd.to_datetime(df["date"], utc=True).dt.date
+    df["date"] = pd.to_datetime(df["date"], utc=True)
 
-    grouped = df.groupby(["date", "language"])["code"].sum().unstack(fill_value=0)
+    grouped = df.groupby(["date", "language"])["code"].max().unstack(fill_value=0)
     grouped = grouped.sort_index()
 
     plt.figure(figsize=(14, 7))
@@ -71,14 +72,14 @@ def plot(csv_file):
     plt.grid(axis="y", linestyle="--", alpha=0.5)
     plt.tight_layout()
 
-    output_path = Path.home() / "loc.png"
-    plt.savefig(output_path)
-    print(f"Chart saved to {output_path}")
+    plt.savefig(png_path)
+    print(f"Plot saved to {png_path}")
 
 def main():
     parser = argparse.ArgumentParser(description="Count lines of code per commit.")
     parser.add_argument("repo", help="Path to the Git repository")
     parser.add_argument("--outdir", default=".", help="Path to the directory where output files will be saved")
+    parser.add_argument("--langs", default="", help="Path to the directory where output files will be saved")
     args = parser.parse_args()
 
     repo_path = Path(args.repo).resolve()
@@ -86,8 +87,15 @@ def main():
         print(f"Error: {repo_path} is not a valid Git repository.")
         return
 
-    csv_file = count_loc(repo_path, args.outdir)
-    plot(csv_file)
+    repo_name = repo_path.name
+
+    csv_path = f"{args.outdir}/loc_{repo_name}.csv"
+    png_path = f"{args.outdir}/loc_{repo_name}.png"
+
+    count_loc(repo_path, csv_path, args.langs)
+    plot(csv_path, png_path)
+
+    print(f"\nDone! Output written to [{csv_path}] and [{png_path}]")
 
 
 if __name__ == "__main__":
