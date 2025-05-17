@@ -2,7 +2,7 @@
 
 Plots lines of code over time in a Git repository.
 
-This script uses [cloc](https://github.com/AlDanial/cloc) to count lines of codes in each commit of a branch in a given repository. 
+This script uses [cloc](https://github.com/AlDanial/cloc) to count lines of code in each commit of a branch in a given repository. 
 
 The output consists of two files:
 
