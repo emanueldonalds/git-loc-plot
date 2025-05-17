@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 import subprocess
 import tempfile
 import argparse
@@ -15,9 +16,12 @@ def count_loc(repo_path, csv_path, langs):
         .splitlines()
     )
     n_commits = len(commits)
+    loc_files = []
 
-    with tempfile.NamedTemporaryFile(mode="w", delete=False) as temp_file:
+    with tempfile.TemporaryDirectory(delete=False) as temp_dir:
         for i, commit in enumerate(commits, 1):
+            print(f"\rCounting LOC in commit {commit} [{i} / {n_commits}] ", end="")
+
             raw_date = (
                 subprocess.check_output(
                     ["git", "log", commit, "--pretty=format:%ci", "-n1"], cwd=repo_path
@@ -32,32 +36,36 @@ def count_loc(repo_path, csv_path, langs):
                 .strip()
             )
 
-            cloc_args = ["cloc", commit, "--git", "--vcs=git", "--csv"]
+            loc_file = f"{temp_dir}/{cmt_date}.csv"
+
+            cloc_args = ["cloc", commit, "--git", "--vcs=git", "--csv", f"--report-file={loc_file}"]
             if langs:
                 cloc_args.append(f"--include-lang={langs}")
 
-            cloc_output = (
-                subprocess.check_output(
-                    cloc_args, cwd=repo_path
-                )
-                .decode()
-                .splitlines()
-            )
+            subprocess.run(cloc_args, cwd=repo_path, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            loc_files.append(loc_file)
 
-            data_lines = cloc_output[1:-1]
-            for line in data_lines:
-                row = f"{cmt_date},{line}"
-                temp_file.write(row + "\n")
+    # join all files together
+    df = pd.DataFrame()
 
-            print(f"\rCounting LOC in commit {commit} [{i} / {n_commits}] ", end="")
+    for file in loc_files:
+        partial_df = pd.read_csv(file)
 
-    os.replace(temp_file.name, csv_path)
+        # Don't want the generated SUM row
+        partial_df = partial_df[partial_df["language"] != "SUM"]
 
-def plot(csv_path, png_path):
-    df = pd.read_csv(csv_path, header=None, names=["date", "files", "language", "blank", "comment", "code"])
+        date = os.path.basename(file)
+        date = str.split(date, ".")[0]
+        date = datetime.fromisoformat(date)
+        partial_df["date"] = date
+        partial_df = partial_df[["date", "language", "code"]]
+        
+        df = pd.concat([df, partial_df], ignore_index=True)
 
-    df["date"] = pd.to_datetime(df["date"], utc=True)
+    df.to_csv(csv_path)
+    return df
 
+def plot(df, png_path):
     grouped = df.groupby(["date", "language"])["code"].max().unstack(fill_value=0)
     grouped = grouped.sort_index()
 
@@ -65,7 +73,7 @@ def plot(csv_path, png_path):
     for language in grouped.columns:
         plt.plot(grouped.index, grouped[language], label=language)
 
-    plt.title("Lines of Code per Language Over Time")
+    #plt.title("Lines of code over time")
     plt.xlabel("Date")
     plt.ylabel("Lines of Code")
     plt.legend(loc="upper left", bbox_to_anchor=(1, 1))
@@ -92,10 +100,10 @@ def main():
     csv_path = f"{args.outdir}/loc_{repo_name}.csv"
     png_path = f"{args.outdir}/loc_{repo_name}.png"
 
-    count_loc(repo_path, csv_path, args.langs)
-    plot(csv_path, png_path)
+    df = count_loc(repo_path, csv_path, args.langs)
+    plot(df, png_path)
 
-    print(f"\nDone! Output written to [{csv_path}] and [{png_path}]")
+    print(f"\nOutput written to:\n{csv_path}\n{png_path}")
 
 
 if __name__ == "__main__":
