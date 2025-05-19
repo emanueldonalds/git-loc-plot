@@ -46,7 +46,7 @@ Specify a comma-separated list of languages. To view full list of supported lang
 python loc.py /path/to/repo --langs Java,Gradle
 ```
 
-Use `--outdir` to specify a different directory to store output files. If not specified, files are written to the current work directory.
+Use `--outdir` to specify a directory to write output files to. If not specified, files are written to the current workdir.
 
 ```
 python loc.py /path/to/repo --langs Python --outdir ./results
