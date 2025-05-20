@@ -1,15 +1,13 @@
-import os
 from datetime import datetime
+from pathlib import Path
+import argparse
+import matplotlib.pyplot as plt
+import os
+import pandas as pd
 import subprocess
 import tempfile
-import argparse
-from pathlib import Path
-import matplotlib.pyplot as plt
-import pandas as pd
-import matplotlib.pyplot as plt
-from pathlib import Path
 
-def count_loc(repo_path, csv_path, langs):
+def count_loc(repo_path, csv_path, langs, step):
     commits = (
         subprocess.check_output(["git", "rev-list", "HEAD"], cwd=repo_path)
         .decode()
@@ -19,8 +17,11 @@ def count_loc(repo_path, csv_path, langs):
     loc_files = []
     df = pd.DataFrame()
 
-    with tempfile.TemporaryDirectory(delete=False) as temp_dir:
+    with tempfile.TemporaryDirectory() as temp_dir:
         for i, commit in enumerate(commits, 1):
+            if (i - 1) % step != 0:
+                continue
+
             print(f"\rCounting LOC in commit {commit} [{i} / {n_commits}] ", end="")
 
             raw_date = (
@@ -46,7 +47,7 @@ def count_loc(repo_path, csv_path, langs):
             subprocess.run(cloc_args, cwd=repo_path, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
             if not os.path.exists(loc_file):
-                print(f"\nWarning: cloc did not produce any output for commit {commit}")
+                print(f"\nWarning: cloc did not produce any output for commit {commit}. Incorrect --langs value?")
                 continue
 
             loc_files.append(loc_file)
@@ -90,8 +91,11 @@ def main():
     parser = argparse.ArgumentParser(description="Count lines of code per commit.")
     parser.add_argument("repo", help="Path to the Git repository")
     parser.add_argument("--outdir", default=".", help="Path to the directory where output files will be saved")
-    parser.add_argument("--langs", default="", help="Path to the directory where output files will be saved")
+    parser.add_argument("--langs", default="", help="Comma separated list of programming languages to include")
+    parser.add_argument("--step", default="1", help="Only count LOC in every n:th commit to speed up processing time. For example, '--step 5' processes one commit, skips four, repeats.")
     args = parser.parse_args()
+
+    step = int(args.step)
 
     repo_path = Path(args.repo).resolve()
     if not (repo_path / ".git").is_dir():
@@ -103,7 +107,7 @@ def main():
     csv_path = os.path.join(args.outdir, f"loc_{repo_name}.csv")
     png_path = os.path.join(args.outdir, f"loc_{repo_name}.png")
 
-    df = count_loc(repo_path, csv_path, args.langs)
+    df = count_loc(repo_path, csv_path, args.langs, step)
     plot(df, png_path)
 
     print(f"\nOutput written to:\n{csv_path}\n{png_path}")
