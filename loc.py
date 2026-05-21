@@ -7,13 +7,17 @@ import pandas as pd
 import subprocess
 import tempfile
 
-def count_loc(repo_path, csv_path, langs, step):
+def count_loc(repo_path, csv_path, langs, step, last_n_commits):
     commits = (
         subprocess.check_output(["git", "rev-list", "HEAD"], cwd=repo_path)
         .decode()
         .splitlines()
     )
     n_commits = len(commits)
+    if last_n_commits > 0:
+        n_commits = last_n_commits
+        last_idx = -len(commits) + last_n_commits
+        commits = commits[:last_idx]
     loc_files = []
     df = pd.DataFrame()
 
@@ -93,9 +97,11 @@ def main():
     parser.add_argument("--outdir", default=".", help="Path to the directory where output files will be saved")
     parser.add_argument("--langs", default="", help="Comma separated list of programming languages to include")
     parser.add_argument("--step", default="1", help="Only count LOC in every n:th commit to speed up processing time. For example, '--step 5' processes one commit, skips four, repeats.")
+    parser.add_argument("--last-n-commits", default="-1", help="Count LOC from the last N commits")
     args = parser.parse_args()
 
     step = int(args.step)
+    last_n_commits = int(args.last_n_commits)
 
     repo_path = Path(args.repo).resolve()
     if not (repo_path / ".git").is_dir():
@@ -107,7 +113,7 @@ def main():
     csv_path = os.path.join(args.outdir, f"loc_{repo_name}.csv")
     png_path = os.path.join(args.outdir, f"loc_{repo_name}.png")
 
-    df = count_loc(repo_path, csv_path, args.langs, step)
+    df = count_loc(repo_path, csv_path, args.langs, step, last_n_commits)
     plot(df, png_path)
 
     print(f"\nOutput written to:\n{csv_path}\n{png_path}")
