@@ -63,7 +63,7 @@ Use `--step` to speed up processing by only counting every n:th commit. Useful f
 python loc.py /path/to/repo --step 50
 ```
 
-Use `--last-n-commits` to scope the analysis to last N commits that you are interested. It can be used together with `--step`
+Use `--last-n-commits` to scope the analysis to last N commits. It can be used together with `--step`
 
 ```
 python loc.py /path/to/repo --last-n-commits 200
