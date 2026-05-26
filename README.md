@@ -34,7 +34,7 @@ pip install -r requirements.txt
 Basic usage:
 
 ```
-python git-loc-plot.py <path-to-repo> [--langs <Java,Gradle,...>] [--outdir <dir>] [--step <commits>]
+python loc.py <path-to-repo> [--langs <Java,Gradle,...>] [--outdir <dir>] [--step <commits>]
 ```
 
 Example:
